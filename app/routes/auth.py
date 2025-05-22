@@ -160,5 +160,62 @@ def register():
 
 
 
+@auth_bp.route("/google-callback", methods=["POST"])
+def google_callback():
+    try:
+        data = request.get_json()
+        user_data = data.get("user")
+        role = data.get("role")
+        access_token = data.get("access_token")
 
+        if not all([user_data, role, access_token]):
+            return jsonify({
+                "error": "Missing required data",
+                "details": "User data, role, and access token are required"
+            }), 400
+
+        user_id = user_data.get("id")
+        email = user_data.get("email")
+        full_name = user_data.get("full_name")
+
+        if not all([user_id, email]):
+            return jsonify({
+                "error": "Invalid user data",
+                "details": "User ID and email are required"
+            }), 400
+
+        supabase = current_app.supabase
+        table_name = "candidates" if role == "candidate" else "recruiters"
+
+        # Check if user already exists
+        existing_user = supabase.table(table_name).select("*").eq("id", user_id).execute()
+
+        if not existing_user.data:
+            # Create new user in role-specific table
+            user_record = {
+                "id": user_id,
+                "email": email,
+                "full_name": full_name,
+                "created_at": "now()"
+            }
+            
+            supabase.table(table_name).insert(user_record).execute()
+
+        return jsonify({
+            "success": True,
+            "message": "Google authentication successful",
+            "user": {
+                "id": user_id,
+                "email": email,
+                "full_name": full_name,
+                "role": role
+            }
+        }), 200
+
+    except Exception as e:
+        current_app.logger.error(f"Google callback error: {str(e)}")
+        return jsonify({
+            "error": "Server error",
+            "details": str(e)
+        }), 500
 
