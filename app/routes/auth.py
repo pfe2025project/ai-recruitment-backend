@@ -1,6 +1,11 @@
 from flask import Blueprint, request, jsonify, current_app
+import os
+from dotenv import load_dotenv
+import time
+
 
 auth_bp = Blueprint("auth", __name__)
+
 
 @auth_bp.route("/login", methods=["POST"])
 def login():
@@ -58,7 +63,6 @@ def login():
         }), 500
 
 
-
 @auth_bp.route("/register", methods=["POST"])
 def register():
     data = request.get_json()
@@ -82,14 +86,14 @@ def register():
     supabase = current_app.supabase
 
     try:
-        # Check for existing email in both candidate and recruiter tables
-        candidate_check = supabase.table("candidates").select("id").eq("email", email).execute()
-        recruiter_check = supabase.table("recruiters").select("id").eq("email", email).execute()
-
-        if candidate_check.data or recruiter_check.data:
+        # Check if email already exists FOR THIS SPECIFIC ROLE
+        table_name = "candidates" if role == "candidate" else "recruiters"
+        existing_entry = supabase.table(table_name).select("id").eq("email", email).execute()
+        
+        if existing_entry.data:
             return jsonify({
-                "error": "Email already registered",
-                "details": "This email is already associated with an account. Please log in instead."
+                "error": "Account already exists",
+                "details": f"You already have a {role} account with this email."
             }), 409
 
         # Create new auth user
@@ -104,18 +108,7 @@ def register():
                 "details": "Could not create your account. Please try again."
             }), 400
         
-        
-
         user_id = auth_response.user.id
-        table_name = "candidates" if role == "candidate" else "recruiters"
-
-        # Check for duplicate in role-specific table
-        existing_entry = supabase.table(table_name).select("id").eq("email", email).execute()
-        if existing_entry.data:
-            return jsonify({
-                "error": "Account already exists",
-                "details": f"You already have a {role} account associated with this email."
-            }), 409
 
         # Insert user into role-specific table
         supabase.table(table_name).insert({
@@ -124,8 +117,7 @@ def register():
             "created_at": "now()"
         }).execute()
         
-        
-        # Optional: Get session/token from auth_response (Supabase v2 doesn't return session in sign_up directly)
+        # Get session token
         access_token = None
         if hasattr(auth_response, 'session') and auth_response.session:
             access_token = auth_response.session.access_token
@@ -156,10 +148,6 @@ def register():
         }), 500
 
 
-
-
-
-
 @auth_bp.route("/google-callback", methods=["POST"])
 def google_callback():
     try:
@@ -187,23 +175,23 @@ def google_callback():
         supabase = current_app.supabase
         table_name = "candidates" if role == "candidate" else "recruiters"
 
-        # Check if user already exists
+        # Check if user already exists in this specific role table
         existing_user = supabase.table(table_name).select("*").eq("id", user_id).execute()
 
         if not existing_user.data:
-            # Create new user in role-specific table
+            # User doesn't exist in this role table - create the record
             user_record = {
                 "id": user_id,
                 "email": email,
                 "full_name": full_name,
                 "created_at": "now()"
             }
-            
             supabase.table(table_name).insert(user_record).execute()
 
         return jsonify({
             "success": True,
             "message": "Google authentication successful",
+            "access_token": access_token,
             "user": {
                 "id": user_id,
                 "email": email,
@@ -217,5 +205,6 @@ def google_callback():
         return jsonify({
             "error": "Server error",
             "details": str(e)
-        }), 500
-
+        }), 500    
+        
+  
