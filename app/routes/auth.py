@@ -7,146 +7,81 @@ import time
 auth_bp = Blueprint("auth", __name__)
 
 
-@auth_bp.route("/login", methods=["POST"])
-def login():
+
+@auth_bp.route("/sync-profile", methods=["POST"])
+def sync_profile():
     try:
         data = request.get_json()
+        user_id = data.get("id")
         email = data.get("email")
-        password = data.get("password")
         role = data.get("role")
+        full_name = data.get("full_name") # Optionnel, souvent présent pour les utilisateurs OAuth
 
-        # Validation with user-friendly messages
-        if not all([email, password, role]):
+        # --- Validation des données reçues du frontend ---
+        if not all([user_id, email, role]):
             return jsonify({
-                "error": "Please fill in all fields",
-                "details": "Email, password, and role are required"
+                "error": "Données utilisateur manquantes",
+                "details": "L'ID utilisateur, l'email et le rôle sont requis pour la synchronisation du profil."
             }), 400
-            
+
         if role not in ["candidate", "recruiter"]:
             return jsonify({
-                "error": "Invalid account type",
-                "details": "Please select either candidate or recruiter"
+                "error": "Type de compte invalide",
+                "details": "Le rôle doit être 'candidate' ou 'recruiter'."
             }), 400
 
-        # Supabase authentication
-        supabase = current_app.supabase
-        auth_response = supabase.auth.sign_in_with_password({
-            "email": email,
-            "password": password
-        })
-
-        # Verify user exists in role table
-        user_id = auth_response.user.id
-        table = "candidates" if role == "candidate" else "recruiters"
-        exists = supabase.table(table).select("id").eq("id", user_id).execute()
-
-        if not exists.data:
-            return jsonify({
-                "error": "Account not found",
-                "details": f"Please register as a {role} first"
-            }), 403
-
-        return jsonify({
-            "access_token": auth_response.session.access_token,
-            "user": {
-                "id": user_id,
-                "email": email,
-                "role": role
-            }
-        }), 200
-
-    except Exception as e:
-        current_app.logger.error(f"Login error: {str(e)}")
-        return jsonify({
-            "error": "Login failed",
-            "details": f"{e}"
-        }), 500
-
-
-@auth_bp.route("/register", methods=["POST"])
-def register():
-    data = request.get_json()
-    email = data.get("email")
-    password = data.get("password")
-    role = data.get("role")
-
-    # Input validation with clear messages
-    if not all([email, password, role]):
-        return jsonify({
-            "error": "Missing required fields",
-            "details": "Please provide your email, password, and account type."
-        }), 400
-
-    if role not in ("candidate", "recruiter"):
-        return jsonify({
-            "error": "Invalid account type",
-            "details": "Account type must be either 'candidate' or 'recruiter'."
-        }), 400
-
-    supabase = current_app.supabase
-
-    try:
-        # Check if email already exists FOR THIS SPECIFIC ROLE
+        supabase = current_app.supabase # Accède à l'instance Supabase configurée dans l'application Flask
         table_name = "candidates" if role == "candidate" else "recruiters"
-        existing_entry = supabase.table(table_name).select("id").eq("email", email).execute()
-        
-        if existing_entry.data:
+
+        # --- Vérifier si l'utilisateur existe déjà dans la table de rôle spécifique ---
+        # On sélectionne juste l'ID pour vérifier l'existence, c'est plus léger.
+        existing_user_response = supabase.table(table_name).select("id").eq("id", user_id).execute()
+
+        if existing_user_response.data:
+            # L'utilisateur existe déjà dans cette table de rôle, pas besoin d'insérer.
+            # On peut renvoyer un succès avec un message informatif.
             return jsonify({
-                "error": "Account already exists",
-                "details": f"You already have a {role} account with this email."
-            }), 409
-
-        # Create new auth user
-        auth_response = supabase.auth.sign_up({
-            "email": email,
-            "password": password,
-        })
-
-        if not auth_response.user:
-            return jsonify({
-                "error": "Registration failed",
-                "details": "Could not create your account. Please try again."
-            }), 400
-        
-        user_id = auth_response.user.id
-
-        # Insert user into role-specific table
-        supabase.table(table_name).insert({
-            "id": user_id, 
-            "email": email,
-            "created_at": "now()"
-        }).execute()
-        
-        # Get session token
-        access_token = None
-        if hasattr(auth_response, 'session') and auth_response.session:
-            access_token = auth_response.session.access_token
+                "success": True,
+                "message": f"Le profil utilisateur existe déjà dans la table '{table_name}'.",
+                "user_id": user_id,
+                "role": role
+            }), 200
         else:
-            # Sign in to get session immediately after sign up
-            login_response = supabase.auth.sign_in_with_password({
-                "email": email,
-                "password": password
-            })
-            access_token = login_response.session.access_token
-
-        return jsonify({
-            "success": True,
-            "message": "Registration successful.",
-            "access_token": access_token,
-            "user": {
+            # L'utilisateur n'existe pas dans cette table de rôle - créer l'enregistrement
+            user_record = {
                 "id": user_id,
                 "email": email,
-                "role": role
+                # Supabase gère "now()" pour les colonnes de type timestamp avec valeur par défaut
+                "created_at": "now()" 
             }
-        }), 201
+            if full_name: # Ajouter le nom complet si fourni (utile pour les utilisateurs Google)
+                user_record["full_name"] = full_name
+
+            insert_response = supabase.table(table_name).insert(user_record).execute()
+
+            # Vérifier si l'insertion a réussi
+            if insert_response.data:
+                return jsonify({
+                    "success": True,
+                    "message": f"Profil utilisateur créé avec succès dans la table '{table_name}'.",
+                    "user_id": user_id,
+                    "role": role
+                }), 201 # 201 Created pour une nouvelle ressource
+            else:
+                # Gérer les erreurs d'insertion de Supabase
+                current_app.logger.error(f"Erreur d'insertion Supabase pour {table_name}: {insert_response.error}")
+                return jsonify({
+                    "error": "Échec de la création du profil dans la base de données",
+                    "details": insert_response.error.message if insert_response.error else "Erreur de base de données inconnue"
+                }), 500
 
     except Exception as e:
-        current_app.logger.error(f"Registration error: {str(e)}")
+        # Gestion générale des exceptions
+        current_app.logger.error(f"Erreur lors de la synchronisation du profil: {str(e)}")
         return jsonify({
-            "error": "Server error",
-            "details": f"{e}"
+            "error": "Erreur serveur lors de la synchronisation du profil",
+            "details": str(e)
         }), 500
-
 
 @auth_bp.route("/google-callback", methods=["POST"])
 def google_callback():
