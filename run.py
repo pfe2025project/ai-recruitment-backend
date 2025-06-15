@@ -15,7 +15,31 @@ CORS(
             "expose_headers": ["Content-Type"],
             "max_age": 600
         },
-        r"/cv*": {  # Changed from /cv/* to /cv* to cover all variations
+        r"/cv*": {  
+            "origins": ["http://localhost:3000", "http://192.168.106.1:3000"],
+            "methods": ["POST", "PUT", "DELETE", "GET", "OPTIONS"],
+            "allow_headers": ["Content-Type", "Authorization"],
+            "supports_credentials": True,
+            "expose_headers": ["Content-Type"],
+            "max_age": 600
+        },
+        r"/profile*": {  
+            "origins": ["http://localhost:3000", "http://192.168.106.1:3000"],
+            "methods": ["POST", "PUT", "DELETE", "GET", "OPTIONS"],
+            "allow_headers": ["Content-Type", "Authorization"],
+            "supports_credentials": True,
+            "expose_headers": ["Content-Type"],
+            "max_age": 600
+        },
+        r"/parser*": {  
+            "origins": ["http://localhost:3000", "http://192.168.106.1:3000"],
+            "methods": ["POST", "PUT", "DELETE", "GET", "OPTIONS"],
+            "allow_headers": ["Content-Type", "Authorization"],
+            "supports_credentials": True,
+            "expose_headers": ["Content-Type"],
+            "max_age": 600
+        },
+        r"/job*": {  
             "origins": ["http://localhost:3000", "http://192.168.106.1:3000"],
             "methods": ["POST", "PUT", "DELETE", "GET", "OPTIONS"],
             "allow_headers": ["Content-Type", "Authorization"],

@@ -16,8 +16,17 @@ def create_app():
 
     # Register blueprints
     from .routes.auth import auth_bp
-    from .routes.cv import candidate_bp
+    from .routes.cv import cv_bp
+    from .routes.profile import profile_bp
+    from .routes.job  import job_bp
+    from .routes.parser  import parser_bp
+    
     app.register_blueprint(auth_bp, url_prefix="/auth")
-    app.register_blueprint(candidate_bp, url_prefix="/cv")
+    app.register_blueprint(cv_bp, url_prefix="/cv")
+    app.register_blueprint(profile_bp, url_prefix="/profile")
+    app.register_blueprint(parser_bp, url_prefix="/parser")
+    app.register_blueprint(job_bp, url_prefix="/job")
+
+
 
     return app
