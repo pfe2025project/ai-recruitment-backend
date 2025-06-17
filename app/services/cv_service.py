@@ -109,7 +109,7 @@ def upload_cv():
         result = update_or_insert_candidate_profile(supabase, uid, public_url)
         if "error" in result:
             return result, 500
-
+   
 
         return {"success": True, "url": public_url}, 200
 

@@ -33,6 +33,9 @@ CREATE TABLE public.candidate_profiles (
   website text,
   github text,
   cv_last_updated timestamp without time zone DEFAULT now(),
+  certifications jsonb DEFAULT '[]'::jsonb,
+  languages jsonb DEFAULT '[]'::jsonb,
+  job_preferences jsonb DEFAULT '{}'::jsonb,
   CONSTRAINT candidate_profiles_pkey PRIMARY KEY (id),
   CONSTRAINT candidate_profiles_candidate_id_fkey FOREIGN KEY (candidate_id) REFERENCES public.candidates(id)
 );
@@ -67,6 +70,14 @@ CREATE TABLE public.jobs (
   education text,
   file_url text,
   created_at timestamp without time zone DEFAULT now(),
+  contract_type text,
+  work_mode text,
+  salary_min numeric,
+  salary_max numeric,
+  salary_currency text DEFAULT 'EUR'::text,
+  skills ARRAY,
+  is_active boolean DEFAULT true,
+  match_criteria jsonb,
   CONSTRAINT jobs_pkey PRIMARY KEY (id),
   CONSTRAINT jobs_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id)
 );

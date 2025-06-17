@@ -20,12 +20,14 @@ def create_app():
     from .routes.profile import profile_bp
     from .routes.job  import job_bp
     from .routes.parser  import parser_bp
+    from .routes.application  import application_bp
     
     app.register_blueprint(auth_bp, url_prefix="/auth")
     app.register_blueprint(cv_bp, url_prefix="/cv")
     app.register_blueprint(profile_bp, url_prefix="/profile")
     app.register_blueprint(parser_bp, url_prefix="/parser")
     app.register_blueprint(job_bp, url_prefix="/job")
+    app.register_blueprint(application_bp, url_prefix="/application")
 
 
 
