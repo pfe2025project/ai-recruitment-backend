@@ -1,7 +1,9 @@
 from flask import Blueprint, jsonify, current_app, request
 from app.services.job_services import get_jobs_data, get_job_by_id, get_recommended_jobs
 
+
 job_bp = Blueprint("job", __name__)
+
 
 @job_bp.route("", methods=["GET"])
 def get_jobs():
@@ -32,6 +34,7 @@ def get_jobs():
         current_app.logger.error(f"Error getting jobs: {str(e)}")
         return jsonify({"error": "Internal server error"}), 500
 
+
 @job_bp.route("/<job_id>", methods=["GET"])
 def get_job(job_id):
     try:
@@ -43,6 +46,7 @@ def get_job(job_id):
         current_app.logger.error(f"Error getting job {job_id}: {str(e)}")
         return jsonify({"error": "Internal server error"}), 500
 
+
 @job_bp.route("/recommended", methods=["GET"])
 def get_recommended():
     try:
@@ -51,3 +55,7 @@ def get_recommended():
     except Exception as e:
         current_app.logger.error(f"Error getting recommended jobs: {str(e)}")
         return jsonify({"error": "Internal server error"}), 500
+    
+    
+    
+    

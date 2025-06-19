@@ -152,32 +152,19 @@ def create_application():
             except Exception as fallback_error:
                 current_app.logger.error(f"Fallback query error: {str(fallback_error)}")
                 return {"error": "Failed to verify existing applications"}, 500
-
-        # Get candidate info with error handling
-        try:
-            candidate = supabase.table("candidates") \
-                .select("*") \
-                .eq("id", authenticated_uid) \
-                .single() \
-                .execute()
             
-            candidate_data = candidate.data
-        except Exception as e:
-            current_app.logger.error(f"Error fetching candidate: {str(e)}")
-            return {"error": "Failed to fetch candidate information"}, 500
-
         # Get default CV URL with error handling
-        try:
-            profile = supabase.table("candidate_profiles") \
-                .select("cv_path") \
-                .eq("candidate_id", authenticated_uid) \
-                .maybe_single() \
-                .execute()
+        # try:
+        #     profile = supabase.table("candidate_profiles") \
+        #         .select("cv_path") \
+        #         .eq("candidate_id", authenticated_uid) \
+        #         .maybe_single() \
+        #         .execute()
                 
-            default_cv_url = profile.data.get("cv_path") if profile.data else candidate_data.get("cv_url")
-        except Exception as e:
-            current_app.logger.error(f"Error fetching candidate profile: {str(e)}")
-            default_cv_url = candidate_data.get("cv_url")
+        #     default_cv_url = profile.data.get("cv_path") if profile.data else candidate_data.get("cv_url")
+        # except Exception as e:
+        #     current_app.logger.error(f"Error fetching candidate profile: {str(e)}")
+        #     default_cv_url = candidate_data.get("cv_url")
 
         # Handle file uploads with better validation
         custom_cv_url = None
@@ -221,6 +208,9 @@ def create_application():
 
             if not response.data or len(response.data) == 0:
                 raise ValueError("No data returned from insert operation")
+            
+            
+            # here  we should calculate  scores 
 
             return {
                 "success": True,
@@ -234,6 +224,8 @@ def create_application():
     except Exception as e:
         current_app.logger.error(f"Unexpected error in create_application: {str(e)}")
         return {"error": "Internal server error"}, 500
+    
+
     
 def update_application(application_id):
     authenticated_uid = verify_supabase_token()

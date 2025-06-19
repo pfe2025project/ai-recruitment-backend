@@ -4,6 +4,35 @@ import json
 from datetime import datetime
 from .cv_service import verify_supabase_token
 
+def extract_skills(text):
+    """
+    Extrait les compétences depuis un texte brut avec SkillNER.
+    Retourne une liste d'objets contenant des informations sur chaque compétence.
+    """
+    skill_extractor = current_app.skill_extractor
+    SKILL_DB=current_app.SKILL_DB
+    annotations = skill_extractor.annotate(text)
+    skills = []
+
+    # Parcourir les résultats pour tous les types de matching
+    # current_app.logger.error(text)
+
+    for type_matching, arr_skills in annotations["results"].items():
+        for skill in arr_skills:
+            # Récupérer le nom de la compétence à partir de l'id
+            if skill['skill_id'] in SKILL_DB:
+                skill_name = SKILL_DB[skill['skill_id']]['skill_name']
+                current_app.logger.error(skill_name)
+                skills.append(skill_name)
+
+    
+    return skills
+
+def filter_non_empty(data: dict):
+    return {k: v for k, v in data.items() if v not in ("", None, [], {}, "[]", "{}")}
+
+
+
 def extract_profile_data():
     authenticated_uid = verify_supabase_token()
     if not authenticated_uid:
@@ -13,78 +42,76 @@ def extract_profile_data():
     
     try:
         # Get CV URL
-        response = supabase.table("candidates").select("cv_url").eq("id", authenticated_uid).single().execute()
-        cv_url = response.data.get("cv_url")
+        response = supabase.table("candidate_profiles").select("cv").eq("candidate_id", authenticated_uid).execute()
+        cv = response.data[0].get("cv") if response.data else ""
+
         
-        if not cv_url:
+        if not cv:
             return {"error": "CV not found"}, 404
         
+        # extract skills with skillner 
+        skillner_skills = extract_skills(cv)
+
+
+        
         # Mock response for male candidate matching both TypeScript and DB structure
+        # this parsed data will coming from a function 
         parsed_data = {
-            "name": "Thomas Martin",
-            "title": "Ingénieur Logiciel Senior",
-            "location": "Paris, France",
-            "avatarUrl": "https://storage.example.com/avatars/thomas-martin.jpg",
-            "about": "Ingénieur logiciel avec 8 ans d'expérience en développement backend et architecture cloud. Expert en Python et systèmes distribués.",
+            "name": "",
+            "title": "",
+            "location": "",
+            "avatarUrl": "",
+            "about": "",
             "experiences": [
                 {
-                    "title": "Architecte Logiciel",
-                    "company": "ScaleTech Solutions",
-                    "period": "2021-01-01/2023-12-31",
-                    "location": "Paris, France",
-                    "description": "Conception d'architecture microservices pour plateforme SaaS"
-                },
-                {
-                    "title": "Développeur Backend Senior",
-                    "company": "DataSystems France",
-                    "period": "2018-06-01/2020-12-31",
-                    "location": "Lyon, France",
-                    "description": "Développement d'APIs et services backend en Python"
+                    "title": "",
+                    "company": "",
+                    "period": "",
+                    "location": "",
+                    "description": ""
                 }
             ],
             "education": [
                 {
-                    "degree": "Diplôme d'Ingénieur en Informatique",
-                    "institution": "École Polytechnique",
-                    "period": "2014-09-01/2017-06-30",
-                    "location": "Palaiseau, France",
-                    "description": "Spécialisation en systèmes distribués"
+                    "degree": "",
+                    "institution": "",
+                    "period": "",
+                    "location": "",
+                    "description": ""
                 }
             ],
             "skills": {
                 "extracted": {
-                    "pySkills": ["Python", "Django", "FastAPI", "Pandas"],
-                    "skillnerSkills": ["AWS", "Docker", "Kubernetes"]
+                    "pySkills": [],
+                    "skillnerSkills": skillner_skills
                 },
-                "added": ["Terraform", "GraphQL", "Redis"]
+                "added": []
             },
             "languages": [
-                {"name": "Français", "proficiency": "Langue maternelle"},
-                {"name": "Anglais", "proficiency": "Courant (TOEIC 920)"}
+                {"name": "", "proficiency": ""}
             ],
             "certifications": [
                 {
-                    "name": "AWS Certified Solutions Architect",
-                    "issuingBody": "Amazon Web Services",
-                    "issueDate": "2022-05-20",
-                    "credentialUrl": "https://aws.cert/789012"
+                    "name": "",
+                    "issuingBody": "",
+                    "issueDate": "",
+                    "credentialUrl": ""
                 }
             ],
             "jobPreferences": {
                 "isAvailable": True,
-                "jobType": "CDI",
-                "preferredLocation": "Paris ou remote",
-                "noticePeriod": "1 mois"
+                "jobType": "",
+                "preferredLocation": "",
+                "noticePeriod": ""
             },
             "contact": {
-                "email": "thomas.martin@example.com",
-                "phone": "+33698765432",
-                "linkedin": "linkedin.com/in/thomasmartin",
-                "website": "thomasmartin.dev",
-                "github": "github.com/tmartin"
+                "email": "",
+                "phone": "",
+                "linkedin": "",
+                "website": "",
+                "github": ""
             },
             "cvLastUpdated": datetime.now().isoformat(),
-            "cvPdfUrl": cv_url
         }
     
     
@@ -107,21 +134,36 @@ def extract_profile_data():
         }
         
         
-        # Update candidates table
-        supabase.table("candidates").update({
+        # candidate  updates
+        candidates_update = {
             "full_name": parsed_data.get("name", ""),
             "phone": parsed_data.get("contact", {}).get("phone", ""),
-        }).eq("id", authenticated_uid).execute()
-        
+        }
+
+        # Filtrer les valeurs non vides
+        filtered_candidates_update = filter_non_empty(candidates_update)
+
+        if filtered_candidates_update:
+            supabase.table("candidates") \
+                    .update(filtered_candidates_update) \
+                    .eq("id", authenticated_uid) \
+                    .execute()
             
-        
-        supabase.table("candidate_profiles") \
-                .update(profile_updates) \
-                .eq("candidate_id", authenticated_uid) \
-                .execute()
-        
-        return {"success": True, "data": parsed_data}, 200
-        
+        # candidate profile
+        # Filtrer les champs non vides
+        filtered_profile_updates = filter_non_empty(profile_updates)
+
+        if filtered_profile_updates:
+            supabase.table("candidate_profiles") \
+                    .update(filtered_profile_updates) \
+                    .eq("candidate_id", authenticated_uid) \
+                    .execute()
+                    
+                    
+                    
+        return {"message": "Profile updated successfully."}, 200
+
+            
     except Exception as e:
         current_app.logger.error(f"Error extracting profile data: {str(e)}")
         return {"error": "Internal server error"}, 500

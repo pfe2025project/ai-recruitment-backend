@@ -13,7 +13,6 @@ def handle_update_application(application_id):
     response, status = update_application(application_id)
     return jsonify(response), status
 
-
 @application_bp.route("/candidate/<user_id>", methods=["GET"])
 def handle_get_user_applications(user_id):
     response, status = get_user_applications(user_id)

@@ -2,6 +2,8 @@ import datetime
 from flask import current_app, request
 from werkzeug.utils import secure_filename
 from supabase import Client, StorageException
+from app.utils.convert_to_text import extract_cv_text
+
 
 ALLOWED_EXTENSIONS = {'pdf', 'doc', 'docx'}
 
@@ -23,7 +25,7 @@ def verify_supabase_token() -> str | None:
         current_app.logger.error(f"Supabase token verification failed: {str(e)}")
         return None
     
-def update_or_insert_candidate_profile(supabase, uid, public_url):
+def update_or_insert_candidate_profile(supabase, uid, public_url,cv_text):
     # Step 1: Check if profile exists
     existing_profile = supabase.table("candidate_profiles").select("id").eq("candidate_id", uid).execute()
 
@@ -33,7 +35,8 @@ def update_or_insert_candidate_profile(supabase, uid, public_url):
         update_response = supabase.table("candidate_profiles").update({
             "cv_path": public_url,
             "cv_last_updated": datetime.datetime.utcnow().isoformat(),
-            "source": "candidate"
+            "source": "candidate",
+            "cv":cv_text
         }).eq("id", profile_id).execute()
 
         if hasattr(update_response, 'error') and update_response.error:
@@ -44,7 +47,8 @@ def update_or_insert_candidate_profile(supabase, uid, public_url):
             "candidate_id": uid,
             "cv_path": public_url,
             "cv_last_updated": datetime.datetime.utcnow().isoformat(),
-            "source": "candidate"
+            "source": "candidate",
+            "cv":cv_text
         }).execute()
 
         if hasattr(insert_response, 'error') and insert_response.error:
@@ -90,6 +94,11 @@ def upload_cv():
 
         # Read file content and upload
         file_content = file.read()
+        
+        # Extract text
+        cv_text = extract_cv_text(file_content, extension)
+        if not cv_text:
+            return {"error": "Failed to extract CV text"}, 500
 
         supabase.storage.from_("cvs").upload(
             path=filename,
@@ -101,12 +110,14 @@ def upload_cv():
         )
 
         public_url = supabase.storage.from_("cvs").get_public_url(filename)
+        
+        
 
         update_response = supabase.table("candidates").update({"cv_url": public_url}).eq("id", uid).execute()
         if hasattr(update_response, 'error') and update_response.error:
             return {"error": "Failed to update Supabase candidates DB"}, 500
 
-        result = update_or_insert_candidate_profile(supabase, uid, public_url)
+        result = update_or_insert_candidate_profile(supabase, uid, public_url,cv_text)
         if "error" in result:
             return result, 500
    
