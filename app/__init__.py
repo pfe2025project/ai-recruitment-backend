@@ -2,6 +2,7 @@ from flask import Flask
 from supabase import create_client
 import os
 from dotenv import load_dotenv
+from flask_cors import CORS
 
 # === SkillNer Setup ===
 import spacy
@@ -39,5 +40,6 @@ def create_app():
     app.register_blueprint(parser_bp, url_prefix="/parser")
     app.register_blueprint(job_bp, url_prefix="/job")
     app.register_blueprint(application_bp, url_prefix="/application")
+    CORS(app,supports_credentials=True);
 
     return app
