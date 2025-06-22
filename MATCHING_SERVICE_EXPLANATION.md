@@ -29,7 +29,7 @@ The matching process involves several steps:
 
 ## 4. Automatic Matching Triggers
 
-*   **CV Upload**: When a candidate's CV is fully uploaded and its information extracted via the `POST /api/cv/upload` endpoint, the system automatically triggers a candidate-to-job matching process. The results are saved to the `candidate_job_matches` table.
+*   **CV Upload**: When a candidate's CV is fully uploaded and its information extracted via the `POST /api/cv` endpoint, the system automatically triggers a candidate-to-job matching process. The results are saved to the `candidate_job_matches` table.
 *   **Job Addition**: When a new job offer is added via the `POST /api/jobs` endpoint, the system automatically triggers a job-to-candidate matching process. The results are saved to the `candidate_job_matches` table.
 
 ## 5. AI Models Involved (Conceptual)

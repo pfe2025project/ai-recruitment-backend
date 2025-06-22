@@ -120,7 +120,16 @@ def upload_cv():
         result = update_or_insert_candidate_profile(supabase, uid, public_url,cv_text)
         if "error" in result:
             return result, 500
-   
+
+        # Trigger matching after successful CV upload and profile update
+        from app.services.matching_service import get_matching_service
+        matching_service = get_matching_service()
+        try:
+            matching_service.match_candidate_to_jobs(uid)
+            current_app.logger.info(f"Successfully triggered matching for candidate {uid} after CV upload.")
+        except Exception as match_e:
+            current_app.logger.error(f"Error triggering matching for candidate {uid}: {str(match_e)}", exc_info=True)
+            # Decide whether to return an error or proceed. For now, we'll log and proceed.
 
         return {"success": True, "url": public_url}, 200
 
