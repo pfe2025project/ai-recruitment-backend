@@ -146,6 +146,25 @@ class MatchingService:
             
             # Sort by match score descending and limit results
             results.sort(key=lambda x: x['match_score'], reverse=True)
+            
+            # Store results in candidate_job_matches table
+            for match in results:
+                try:
+                    supabase.table("candidate_job_matches").insert({
+                        "candidate_id": candidate_id,
+                        "job_id": match['job_id'],
+                        "match_score": match['match_score'],
+                        "sbert_similarity": match['sbert_similarity'],
+                        "skill2vec_similarity": match['skill2vec_similarity'],
+                        "matched_skills": match['matched_skills'],
+                        "candidate_skills": match['candidate_skills'],
+                        "job_skills": match['job_skills'],
+                        "prediction": match['prediction'],
+                        "match_percentage": match['match_percentage']
+                    }).execute()
+                except Exception as db_e:
+                    current_app.logger.error(f"Error storing match for candidate {candidate_id} and job {match['job_id']}: {str(db_e)}")
+
             return results[:limit]
             
         except Exception as e:
