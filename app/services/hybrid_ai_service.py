@@ -1,5 +1,7 @@
 from typing import Any, Dict, List, Optional, Union
 from sentence_transformers import SentenceTransformer
+from flask import current_app
+from .parser_service import extract_skills
 
 class HybridAIService:
     def __init__(self):
@@ -20,22 +22,38 @@ class HybridAIService:
 
         # Placeholder for actual hybrid score calculation
         # For now, return a dummy score and component scores
-        hybrid_score = 0.75 # Dummy score
+        semantic_similarity = float(embedding1.dot(embedding2) / (sum(embedding1**2)**0.5 * sum(embedding2**2)**0.5))
+
+        # Extract skills using the new method
+        resume_skills = self.extract_skills_dict(text1)
+        job_skills = self.extract_skills_dict(text2)
+
+        # Calculate skill-based similarity
+        common_skills = set(resume_skills) & set(job_skills)
+        skill_similarity = 0.0
+        if len(resume_skills) > 0 and len(job_skills) > 0:
+            skill_similarity = len(common_skills) / max(len(resume_skills), len(job_skills))
+
+        # Combine semantic and skill-based similarity (you can adjust weights)
+        hybrid_score = (semantic_similarity * 0.7) + (skill_similarity * 0.3)
+
+        # Determine prediction based on hybrid score
+        hybrid_prediction = "match" if hybrid_score > 0.5 else "no_match"
+
         return {
             "hybrid_score": hybrid_score,
-            "semantic_score": float(embedding1.dot(embedding2) / (sum(embedding1**2)**0.5 * sum(embedding2**2)**0.5)), # Dummy semantic score
-            "keyword_score": 0.8, # Dummy keyword score
-            "sbert_similarity": float(embedding1.dot(embedding2) / (sum(embedding1**2)**0.5 * sum(embedding2**2)**0.5)), # Dummy sbert_similarity
-            "skill2vec_similarity": 0.7, # Dummy skill2vec_similarity
-            "resume_skills": ["python", "flask"], # Dummy resume_skills
-            "job_skills": ["python", "sql"], # Dummy job_skills
-            "hybrid_prediction": "match" # Dummy hybrid_prediction
+            "semantic_score": semantic_similarity,
+            "skill_similarity": skill_similarity,
+            "sbert_similarity": semantic_similarity,
+            "skill2vec_similarity": skill_similarity, # Using skill_similarity for skill2vec_similarity for now
+            "resume_skills": list(resume_skills),
+            "job_skills": list(job_skills),
+            "hybrid_prediction": hybrid_prediction
         }
 
-    def extract_skills_dict(self, text: str) -> Dict[str, Any]:
-        # Placeholder for skill extraction logic
-        # This method should return a dictionary of extracted skills
-        return {"dummy_skill": 1.0, "another_dummy_skill": 0.5}
+    def extract_skills_dict(self, text: str) -> List[str]:
+        # Use the extract_skills function from parser_service to get skills
+        return extract_skills(text)
 
 def get_hybrid_ai_service():
     return HybridAIService()
