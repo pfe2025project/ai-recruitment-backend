@@ -151,6 +151,16 @@ class MatchingService:
                 results = [r for r in results if r['prediction'] == filter_by_prediction]
             
             # Store results in candidate_job_matches table
+            # Delete all existing matches for this candidate before inserting new ones
+            try:
+                delete_response = supabase.table("candidate_job_matches").delete().eq("candidate_id", candidate_id).execute()
+                if hasattr(delete_response, 'error') and delete_response.error:
+                    current_app.logger.error(f"Failed to delete previous matches for candidate {candidate_id}: {delete_response.error}")
+                else:
+                    current_app.logger.info(f"Successfully deleted previous matches for candidate {candidate_id} before inserting new ones.")
+            except Exception as e:
+                current_app.logger.error(f"Error deleting previous matches for candidate {candidate_id}: {str(e)}", exc_info=True)
+
             for match in results:
                 try:
                     supabase.table("candidate_job_matches").insert({
@@ -194,13 +204,16 @@ class MatchingService:
             
             # Get job information
             job_response = supabase.table("jobs").select(
-                "id, title, description, requirements, location"
+                "title, description, location, requirements"
             ).eq("id", job_id).execute()
-            
+
             if not job_response.data:
+                current_app.logger.warning(f"Job not found for matching: {job_id}")
                 return []
-            
+
             job_data = job_response.data[0]
+
+
             
             # Construct job text
             job_text_parts = [
@@ -295,6 +308,35 @@ class MatchingService:
             
             # Sort by match score descending and limit results
             results.sort(key=lambda x: x['match_score'], reverse=True)
+
+            # Store results in candidate_job_matches table
+            # Delete all existing matches for this job before inserting new ones
+            try:
+                delete_response = supabase.table("candidate_job_matches").delete().eq("job_id", job_id).execute()
+                if hasattr(delete_response, 'error') and delete_response.error:
+                    current_app.logger.error(f"Failed to delete previous matches for job {job_id}: {delete_response.error}")
+                else:
+                    current_app.logger.info(f"Successfully deleted previous matches for job {job_id} before inserting new ones.")
+            except Exception as e:
+                current_app.logger.error(f"Error deleting previous matches for job {job_id}: {str(e)}", exc_info=True)
+
+            for match in results:
+                try:
+                    supabase.table("candidate_job_matches").insert({
+                        "candidate_id": match['candidate_id'],
+                        "job_id": job_id,
+                        "match_score": match['match_score'],
+                        "sbert_similarity": match['sbert_similarity'],
+                        "skill2vec_similarity": match['skill2vec_similarity'],
+                        "matched_skills": match['matched_skills'],
+                        "candidate_skills": match['candidate_skills'],
+                        "job_skills": match['job_skills'],
+                        "prediction": match['prediction'],
+                        "match_percentage": match['match_percentage']
+                    }).execute()
+                except Exception as db_e:
+                    current_app.logger.error(f"Error storing match for job {job_id} and candidate {match['candidate_id']}: {str(db_e)}")
+            
             return results[:limit]
             
         except Exception as e:

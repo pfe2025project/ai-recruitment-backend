@@ -3,6 +3,7 @@ from supabase import create_client
 import os
 from dotenv import load_dotenv
 from flask_cors import CORS
+from flask import Flask, send_from_directory
 
 # === SkillNer Setup ===
 import spacy
@@ -24,6 +25,11 @@ def create_app():
     # Configure upload folder for local CV storage
     app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'uploads', 'cvs')
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+    # Serve static files from the uploads/cvs directory
+    app.add_url_rule('/uploads/cvs/<path:filename>',
+                     endpoint='uploaded_cvs',
+                     view_func=lambda filename: send_from_directory(app.config['UPLOAD_FOLDER'], filename))
 
     # === Initialize SkillNer once ===
     nlp = spacy.load("en_core_web_lg")
