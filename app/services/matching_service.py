@@ -13,8 +13,7 @@ class MatchingService:
     def __init__(self):
         self.hybrid_ai = get_hybrid_ai_service()
     
-    def match_candidate_to_jobs(self, candidate_id: str, job_ids: Optional[List[str]] = None, 
-                               limit: int = 10) -> List[Dict[str, Any]]:
+    def match_candidate_to_jobs(self, candidate_id: str, job_ids: Optional[List[str]] = None, limit: int = 10, filter_by_prediction: Optional[str] = None) -> List[Dict[str, Any]]:
         """
         Match a candidate to jobs using hybrid AI scoring.
         
@@ -144,8 +143,12 @@ class MatchingService:
                     'match_percentage': round(match_result['hybrid_score'] * 100, 2)
                 })
             
-            # Sort by match score descending and limit results
+            # Sort by match score descending
             results.sort(key=lambda x: x['match_score'], reverse=True)
+
+            # Filter by prediction if specified
+            if filter_by_prediction:
+                results = [r for r in results if r['prediction'] == filter_by_prediction]
             
             # Store results in candidate_job_matches table
             for match in results:
@@ -170,6 +173,8 @@ class MatchingService:
         except Exception as e:
             current_app.logger.error(f"Error in candidate job matching: {str(e)}")
             return []
+
+
     
     def match_job_to_candidates(self, job_id: str, candidate_ids: Optional[List[str]] = None,
                                limit: int = 10) -> List[Dict[str, Any]]:
@@ -365,7 +370,7 @@ def get_matching_service() -> MatchingService:
         matching_service = MatchingService()
     return matching_service
 
-def match_candidate_to_jobs_authenticated(job_ids: Optional[List[str]] = None, limit: int = 10) -> tuple:
+def match_candidate_to_jobs_authenticated(job_ids: Optional[List[str]] = None, limit: int = 10, filter_by_prediction: Optional[str] = None) -> tuple:
     """
     Match authenticated candidate to jobs.
     
@@ -378,7 +383,7 @@ def match_candidate_to_jobs_authenticated(job_ids: Optional[List[str]] = None, l
     
     try:
         service = get_matching_service()
-        matches = service.match_candidate_to_jobs(authenticated_uid, job_ids, limit)
+        matches = service.match_candidate_to_jobs(authenticated_uid, job_ids, limit, filter_by_prediction)
         
         return {
             "matches": matches,

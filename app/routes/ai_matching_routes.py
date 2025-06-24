@@ -1,13 +1,15 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
 from app.services.matching_service import (
-    get_matching_service,
-    match_candidate_to_jobs_authenticated,
-    get_skill_recommendations_authenticated
-)
-from app.utils.auth_utils import verify_supabase_token
-from flask import Blueprint, jsonify, request, current_app
+    match_candidate_to_jobs_authenticated
+ )
+
+from flask_cors import CORS
+from typing import Optional, Dict, Any
+import json
 
 ai_matching_bp = Blueprint('ai_matching', __name__, url_prefix='/api/ai-matching')
+
+
 
 @ai_matching_bp.route('/candidate/jobs', methods=['GET', 'OPTIONS'])
 def match_candidate_jobs():
@@ -26,6 +28,7 @@ def match_candidate_jobs():
         # Get query parameters
         job_ids_param = request.args.get('job_ids')
         limit = int(request.args.get('limit', 10))
+        filter_by_prediction = request.args.get('filter_by_prediction')
         
         # Parse job IDs if provided
         job_ids = None
@@ -33,7 +36,7 @@ def match_candidate_jobs():
             job_ids = [job_id.strip() for job_id in job_ids_param.split(',') if job_id.strip()]
         
         # Get matches
-        result, status_code = match_candidate_to_jobs_authenticated(job_ids, limit)
+        result, status_code = match_candidate_to_jobs_authenticated(job_ids, limit, filter_by_prediction)
         return jsonify(result), status_code
         
     except ValueError:
@@ -41,6 +44,44 @@ def match_candidate_jobs():
     except Exception as e:
         current_app.logger.error(f"Error in candidate job matching endpoint: {str(e)}")
         return jsonify({"error": "Internal server error"}), 500
+
+@ai_matching_bp.route('/candidate/<uuid:candidate_id>/job/<uuid:job_id>/score', methods=['GET'])
+def get_candidate_job_score(candidate_id, job_id):
+    try:
+        supabase: Client = current_app.supabase
+
+        # Query the candidate_job_matches table for the specific candidate-job pair
+        match_response = supabase.table("candidate_job_matches").select(
+            "job_id, match_score, sbert_similarity, skill2vec_similarity, matched_skills, candidate_skills, job_skills, prediction, match_percentage"
+        ).eq("candidate_id", str(candidate_id)).eq("job_id", str(job_id)).execute()
+
+        if match_response.data:
+            match_data = match_response.data[0]
+            # For consistency with the previous output, we can structure it similarly
+            response_data = {
+                "candidate_id": str(candidate_id),
+                "job_id": match_data['job_id'],
+                "match_results": {
+                    "hybrid_score": float(match_data['match_score']),
+                    "sbert_similarity": float(match_data['sbert_similarity']),
+                    "skill2vec_similarity": float(match_data['skill2vec_similarity'])
+                },
+                "details": {
+                    "candidate_skills": match_data['candidate_skills'],
+                    "job_skills": match_data['job_skills'],
+                    "common_skills": match_data['matched_skills']
+                },
+                "prediction": match_data['prediction'],
+                "match_percentage": float(match_data['match_percentage']) if match_data.get('match_percentage') is not None else None
+            }
+            return jsonify(response_data), 200
+        else:
+            current_app.logger.warning(f"Match not found for candidate {candidate_id} and job {job_id}.")
+            return jsonify({"message": "Candidate-job match score not found or invalid IDs."}), 404
+
+    except Exception as e:
+        current_app.logger.error(f"Error in get_candidate_job_score: {str(e)}")
+        return jsonify({"message": "Internal server error", "error": str(e)}), 500
 
 @ai_matching_bp.route('/job/<job_id>/candidates', methods=['GET'])
 def match_job_candidates(job_id):

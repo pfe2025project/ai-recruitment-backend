@@ -48,5 +48,4 @@ def create_app():
     app.register_blueprint(application_bp, url_prefix="/application")
     app.register_blueprint(ai_matching_bp)
 
-    CORS(app, resources={r"/api/*": {"origins": "http://localhost:3000"}}, supports_credentials=True)
     return app

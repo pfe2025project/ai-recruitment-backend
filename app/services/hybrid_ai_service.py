@@ -6,7 +6,7 @@ from .parser_service import extract_skills
 class HybridAIService:
     def __init__(self):
         # Initialize the Sentence-BERT model for semantic similarity
-        self.sbert_model = SentenceTransformer('all-MiniLM-L6-v2')
+        self.sbert_model = SentenceTransformer('all-MiniLM-L6-v2', device='cpu')
         # Placeholder for other hybrid AI model components or configurations
         pass
 
