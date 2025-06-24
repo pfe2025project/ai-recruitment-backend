@@ -1,6 +1,7 @@
 from flask import current_app, request
 from supabase import Client
 import json
+import os
 from datetime import datetime
 from .cv_service import verify_supabase_token
 
@@ -19,11 +20,15 @@ def extract_skills(text):
 
     for type_matching, arr_skills in annotations["results"].items():
         for skill in arr_skills:
-            # Récupérer le nom de la compétence à partir de l'id
             if skill['skill_id'] in SKILL_DB:
-                skill_name = SKILL_DB[skill['skill_id']]['skill_name']
-                current_app.logger.error(skill_name)
-                skills.append(skill_name)
+                skill_info = SKILL_DB[skill['skill_id']]
+                skill_name = skill_info['skill_name']
+                skill_type = skill_info.get('skill_type')
+
+                # Only include 'Hard Skill' and 'Soft Skill' types
+                if skill_type in ['Hard Skill', 'Soft Skill']:
+                    current_app.logger.error(f"Extracted Skill: {skill_name} (Type: {skill_type})")
+                    skills.append(skill_name)
 
     
     return skills
@@ -42,8 +47,20 @@ def extract_profile_data():
     
     try:
         # Get CV URL
-        response = supabase.table("candidate_profiles").select("cv").eq("candidate_id", authenticated_uid).execute()
-        cv = response.data[0].get("cv") if response.data else ""
+        response = supabase.table("candidate_profiles").select("cv_path").eq("candidate_id", authenticated_uid).execute()
+        cv_path = response.data[0].get("cv_path") if response.data else ""
+
+        if not cv_path or not os.path.exists(cv_path):
+            return {"error": "CV file not found locally"}, 404
+
+        with open(cv_path, 'rb') as f:
+            cv_content = f.read()
+        
+        # Assuming extract_cv_text can handle raw content and determine type, or we need to pass extension
+        # For now, let's assume cv_path implies the original file type or extract_cv_text handles it.
+        # If not, we'd need to store the original extension in the DB as well.
+        from app.utils.convert_to_text import extract_cv_text
+        cv = extract_cv_text(cv_content, cv_path.split('.')[-1]) # Pass content and extension
 
         
         if not cv:

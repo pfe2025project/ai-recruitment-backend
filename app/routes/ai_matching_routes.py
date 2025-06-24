@@ -9,8 +9,9 @@ from flask import Blueprint, jsonify, request, current_app
 
 ai_matching_bp = Blueprint('ai_matching', __name__, url_prefix='/api/ai-matching')
 
-@ai_matching_bp.route('/candidate/jobs', methods=['GET'])
+@ai_matching_bp.route('/candidate/jobs', methods=['GET', 'OPTIONS'])
 def match_candidate_jobs():
+
     """
     Match authenticated candidate to jobs using hybrid AI.
     

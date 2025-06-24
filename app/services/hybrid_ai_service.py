@@ -28,14 +28,16 @@ class HybridAIService:
         resume_skills = self.extract_skills_dict(text1)
         job_skills = self.extract_skills_dict(text2)
 
+        current_app.logger.info(f"Extracted Resume Skills: {resume_skills}")
+        current_app.logger.info(f"Extracted Job Skills: {job_skills}")
+
         # Calculate skill-based similarity
         common_skills = set(resume_skills) & set(job_skills)
-        skill_similarity = 0.0
-        if len(resume_skills) > 0 and len(job_skills) > 0:
-            skill_similarity = len(common_skills) / max(len(resume_skills), len(job_skills))
+        current_app.logger.info(f"Common Skills: {common_skills}")
+        skill_similarity = len(common_skills) / len(job_skills) if len(job_skills) > 0 else 0.0
 
         # Combine semantic and skill-based similarity (you can adjust weights)
-        hybrid_score = (semantic_similarity * 0.7) + (skill_similarity * 0.3)
+        hybrid_score = (semantic_similarity * 0.5) + (skill_similarity * 0.5)
 
         # Determine prediction based on hybrid score
         hybrid_prediction = "match" if hybrid_score > 0.5 else "no_match"

@@ -1,4 +1,5 @@
 import datetime
+import os
 from flask import current_app, request
 from werkzeug.utils import secure_filename
 from supabase import Client, StorageException
@@ -82,42 +83,31 @@ def upload_cv():
     filename = secure_filename(f"{uid}/cv.{extension}")
     supabase: Client = current_app.supabase
 
-    try:
-        # Try to delete existing file if it exists
-        try:
-            existing_files = supabase.storage.from_("cvs").list(uid)
-            if any(f['name'] == f"cv.{extension}" for f in existing_files):
-                supabase.storage.from_("cvs").remove([filename])
-        except StorageException as e:
-            if "not found" not in str(e).lower():
-                current_app.logger.warning(f"Error checking/deleting existing file: {str(e)}")
+    # Define local storage path
+    upload_folder = current_app.config.get('UPLOAD_FOLDER', 'uploads/cvs')
+    os.makedirs(upload_folder, exist_ok=True)
+    local_file_path = os.path.join(upload_folder, filename)
 
-        # Read file content and upload
-        file_content = file.read()
+    try:
+        # Save file locally
+        file.save(local_file_path)
+        current_app.logger.info(f"CV saved locally at: {local_file_path}")
         
+        # Read file content for text extraction
+        with open(local_file_path, 'rb') as f:
+            file_content = f.read()
+
         # Extract text
         cv_text = extract_cv_text(file_content, extension)
         if not cv_text:
             return {"error": "Failed to extract CV text"}, 500
 
-        supabase.storage.from_("cvs").upload(
-            path=filename,
-            file=file_content,
-            file_options={
-                "content-type": file.mimetype,
-                "x-upsert": "true"
-            }
-        )
-
-        public_url = supabase.storage.from_("cvs").get_public_url(filename)
-        
-        
-
-        update_response = supabase.table("candidates").update({"cv_url": public_url}).eq("id", uid).execute()
+        # Update Supabase with local file path
+        update_response = supabase.table("candidates").update({"cv_url": local_file_path}).eq("id", uid).execute()
         if hasattr(update_response, 'error') and update_response.error:
             return {"error": "Failed to update Supabase candidates DB"}, 500
 
-        result = update_or_insert_candidate_profile(supabase, uid, public_url,cv_text)
+        result = update_or_insert_candidate_profile(supabase, uid, local_file_path, cv_text)
         if "error" in result:
             return result, 500
 
@@ -131,7 +121,7 @@ def upload_cv():
             current_app.logger.error(f"Error triggering matching for candidate {uid}: {str(match_e)}", exc_info=True)
             # Decide whether to return an error or proceed. For now, we'll log and proceed.
 
-        return {"success": True, "url": public_url}, 200
+        return {"success": True, "url": local_file_path}, 200
 
     except StorageException as e:
         current_app.logger.error(f"Storage error during CV upload: {str(e)}")
@@ -164,7 +154,13 @@ def get_cv():
         if not data or not data.get("cv_url"):
             return {"error": "CV not found"}, 404
 
-        return {"cv_url": data["cv_url"]}, 200
+        local_cv_path = data["cv_url"]
+        if not os.path.exists(local_cv_path):
+            return {"error": "CV file not found locally"}, 404
+
+        # Extract just the filename from the local_cv_path
+        filename = os.path.basename(local_cv_path)
+        return {"cv_filename": filename}, 200
     except Exception as e:
         current_app.logger.error(f"Error getting CV: {str(e)}")
         return {"error": "Internal server error"}, 500
@@ -190,13 +186,11 @@ def delete_cv():
         if not data or not data.get("cv_url"):
             return {"error": "CV not found"}, 404
 
-        public_url = data["cv_url"]
-        try:
-            filename = public_url.split("/storage/v1/object/public/cvs/")[1]
-        except IndexError:
-            return {"error": "Invalid file path"}, 400
-
-        supabase.storage.from_("cvs").remove([filename])
+        local_cv_path = data["cv_url"]
+        if os.path.exists(local_cv_path):
+            os.remove(local_cv_path)
+        else:
+            current_app.logger.warning(f"Attempted to delete non-existent local CV file: {local_cv_path}")
 
         supabase.table("candidates").update({"cv_url": None}).eq("id", uid).execute()
         supabase.table("candidate_profiles").update({"cv_path": None}).eq("candidate_id", uid).execute()

@@ -30,7 +30,16 @@ The matching process involves several steps:
 ## 4. Automatic Matching Triggers
 
 *   **CV Upload**: When a candidate's CV is fully uploaded and its information extracted via the `POST /api/cv` endpoint, the system automatically triggers a candidate-to-job matching process. The results are saved to the `candidate_job_matches` table.
+*   **CV Storage**: CVs are now stored locally on the server's file system in the `uploads/cvs` directory. The path to the locally stored CV is saved in the Supabase database. This change improves performance and reduces reliance on external storage for CV processing.
 *   **Job Addition**: When a new job offer is added via the `POST /api/jobs` endpoint, the system automatically triggers a job-to-candidate matching process. The results are saved to the `candidate_job_matches` table.
+
+- **Skill Extraction**: Skills are extracted from both resumes and job descriptions using a SkillNER model. The `extract_skills` function now specifically filters for 'Hard Skill' and 'Soft Skill' types, ensuring more relevant skills are considered for matching. These extracted skills are then used to calculate a `skill2vec_similarity` score.
+
+### Recent Changes and Improvements
+
+- **Local CV Storage**: CVs are now stored locally in the `uploads/cvs` directory instead of Supabase Storage. The path to the local file is saved in the Supabase database. This change improves performance and reduces reliance on external storage.
+- **`skillner_skills` Column**: The `skills` column in `candidate_profiles` was renamed to `skillner_skills` to accurately reflect the source of the extracted skills.
+- **Frontend Integration**: The `get_cv` function in `cv_service.py` now returns only the filename, and a new `/cv/download/<filename>` endpoint in `app/routes/cv.py` serves the CV files. The frontend is expected to use this endpoint to fetch and display CVs.
 
 ## 5. AI Models Involved (Conceptual)
 

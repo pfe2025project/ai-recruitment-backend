@@ -31,7 +31,7 @@ class MatchingService:
             
             # Get candidate profile and CV
             candidate_response = supabase.table("candidate_profiles").select(
-                "cv_path, skills, experience, education"
+                "cv_path, skillner_skills, experience, education"
             ).eq("candidate_id", candidate_id).execute()
             
             if not candidate_response.data:
@@ -41,7 +41,7 @@ class MatchingService:
             
             # Construct candidate text from available data
             cv_text = candidate_data.get('cv_path', '')
-            skills = candidate_data.get('skills', [])
+            skills = candidate_data.get('skillner_skills', [])
             experience = candidate_data.get('experience', '[]')
             education = candidate_data.get('education', '[]')
             
