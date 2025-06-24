@@ -118,7 +118,7 @@ def create_application():
                 }
             ).execute()
             
-            current_app.logger.error(f"existing_response : {str(existing_response.data[0].get("is_existing"))}")
+            current_app.logger.error(f"existing_response : {str(existing_response.data[0].get('is_existing'))}")
 
 
             if existing_response.data and existing_response.data[0].get('is_existing'):
